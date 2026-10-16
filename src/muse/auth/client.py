@@ -2,6 +2,7 @@
 Authentication and registration workflow client for Meta Muse.
 """
 
+import re
 import uuid
 from typing import Any, Dict, Optional, cast
 
@@ -236,11 +237,20 @@ class MuseAuthClient:
     def redeem_invite_code(self, invite_code: str) -> Dict[str, Any]:
         """
         Step 7: Redeem invite code (/hatch/invite_code/redeem).
+        Automatically strips non-alphanumeric chars and forces uppercase matching
+        the official Android AuraInviteCodeViewModel specification.
         """
+        clean_code = re.sub(r"[^A-Za-z0-9]", "", invite_code).strip().upper()
+        if len(clean_code) != 6:
+            logger.warning(
+                f"Invite code '{clean_code}' length is {len(clean_code)}, "
+                "expected exactly 6 characters."
+            )
+
         resp = self.api.post(
             HatchEndpoints.INVITE_CODE_REDEEM,
             headers={"Content-Type": "application/json; charset=utf-8"},
-            json={"code": invite_code},
+            json={"code": clean_code},
         )
         data = cast(Dict[str, Any], resp.json())
         logger.info(f"Invite code redeemed! New status: {data.get('waitlist_status')}")

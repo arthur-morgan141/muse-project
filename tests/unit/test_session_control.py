@@ -4,7 +4,9 @@ Unit tests for SessionStore and session management controls.
 
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
+from muse.api.client import MuseApiClient
 from muse.auth.client import MuseAuthClient
 from muse.auth.session import SessionStore
 from muse.core.config import MuseConfig
@@ -72,3 +74,20 @@ def test_initialize_session_force_new_vs_resume():
         fresh_state = client.initialize_session(force_new=True)
         assert fresh_state.device_id != "old-device-id"
         assert store.has_session() is False
+
+
+def test_redeem_invite_code_formatting():
+    mock_api = MagicMock(spec=MuseApiClient)
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"waitlist_status": "FULLY_ACTIVATED"}
+    mock_api.post.return_value = mock_resp
+
+    client = MuseAuthClient(api_client=mock_api)
+
+    # Pass messy lowercase code with dashes and whitespace: " k7-x9p2 "
+    client.redeem_invite_code(" k7-x9p2 ")
+
+    # Verify that clean uppercase code "K7X9P2" was sent to the server
+    mock_api.post.assert_called_once()
+    call_args = mock_api.post.call_args
+    assert call_args.kwargs["json"]["code"] == "K7X9P2"

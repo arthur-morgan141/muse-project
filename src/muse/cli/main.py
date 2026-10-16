@@ -16,6 +16,7 @@ import sys
 from muse.__version__ import __version__
 from muse.auth.client import MuseAuthClient
 from muse.core.config import get_config, load_config
+from muse.core.exceptions import MuseApiError
 from muse.core.logging import setup_logger
 from muse.core.models import UserProfile
 from muse.termux import (
@@ -219,6 +220,19 @@ def handle_register(args: argparse.Namespace) -> None:
             print("  [ACCESS UNLOCKED] 1 Billion Token access quota activated!")
             send_notification("Meta Muse", f"Invite redeemed! Status: {redeem_res.get('waitlist_status')}")
             vibrate(200)
+        except MuseApiError as e:
+            detail_msg = e.detail.lower()
+            if "invalid" in detail_msg or "invitecodeinvalid" in e.error_type.lower():
+                print(f"\n[FAILED] Invalid invite code '{invite_code.strip().upper()}'.")
+                print("  Possible reasons:")
+                print("  - The code has already been redeemed on another account (single-use).")
+                print("  - Meta invite codes are strictly 6 uppercase alphanumeric characters.")
+            elif "used_up" in detail_msg or "invitecodeusedup" in e.error_type.lower():
+                print(f"\n[FAILED] Invite code '{invite_code.strip().upper()}' has already reached its redemption limit.")
+            elif "revoked" in detail_msg or "invitecoderevoked" in e.error_type.lower():
+                print(f"\n[FAILED] Invite code '{invite_code.strip().upper()}' was revoked by Meta.")
+            else:
+                print(f"[FAILED] Failed to redeem invite code: {e}")
         except Exception as e:
             print(f"[FAILED] Failed to redeem invite code: {e}")
 
@@ -257,6 +271,20 @@ def handle_redeem(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     client.api.set_auth_token(tokens.abra_access_token)
+
+    # Pre-check if account has already redeemed an invite code
+    try:
+        status = client.check_activation_status()
+        if status.has_redeemed_invite_code:
+            print("\n[INFO] This account has ALREADY redeemed an invite code!")
+            print(f"  User ID              : {tokens.abra_user_id}")
+            print(f"  Waitlist Status      : {status.waitlist_status}")
+            print(f"  Hatch Access Active  : {status.has_hatch_access}")
+            print("  Note: Invite codes can only be redeemed once per account.")
+            return
+    except Exception:
+        pass
+
     code = args.code or input("Enter Invite Code: ").strip()
     if not code:
         print("[ERROR] Invite code cannot be empty.")
@@ -269,6 +297,22 @@ def handle_redeem(args: argparse.Namespace) -> None:
         print("  [ACCESS UNLOCKED] 1 Billion Token access quota activated!")
         send_notification("Meta Muse", f"Invite redeemed! Status: {res.get('waitlist_status')}")
         vibrate(200)
+    except MuseApiError as e:
+        detail_msg = e.detail.lower()
+        clean_code = code.strip().upper()
+        if "invalid" in detail_msg or "invitecodeinvalid" in e.error_type.lower():
+            print(f"\n[FAILED] Invalid invite code '{clean_code}'.")
+            print("  Root causes discovered from Android reverse engineering:")
+            print("  1. The code was already redeemed on another account (codes are single-use).")
+            print("  2. Case/format mismatch (Meta codes are exactly 6 uppercase alphanumeric characters).")
+            print("  3. The redemption window expired or account region is ineligible.")
+        elif "used_up" in detail_msg or "invitecodeusedup" in e.error_type.lower():
+            print(f"\n[FAILED] Invite code '{clean_code}' has already reached its maximum redemption quota.")
+        elif "revoked" in detail_msg or "invitecoderevoked" in e.error_type.lower():
+            print(f"\n[FAILED] Invite code '{clean_code}' was revoked by Meta.")
+        else:
+            print(f"\n[FAILED] Error: {e}")
+        sys.exit(1)
     except Exception as e:
         print(f"[FAILED] Error: {e}")
         sys.exit(1)
