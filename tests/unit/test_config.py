@@ -2,7 +2,6 @@
 Unit tests for configuration loading and environment overrides.
 """
 
-import os
 from muse.core.config import load_config
 
 

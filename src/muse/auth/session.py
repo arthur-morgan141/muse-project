@@ -3,6 +3,7 @@ Registration session state persistence and resumption.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -14,18 +15,28 @@ logger = setup_logger("muse.auth.session")
 
 
 class SessionStore:
-    """Manages reading and writing in-flight registration sessions."""
+    """Manages reading and writing in-flight registration sessions with restricted 0600 permissions."""
 
     def __init__(self, config: Optional[MuseConfig] = None):
         self.config = config or get_config()
         self.cache_path = Path(self.config.session_cache_path)
 
     def save(self, state: SessionState) -> None:
-        """Saves session state to disk."""
+        """Saves session state to disk with owner-only (0600) permissions."""
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.cache_path, "w", encoding="utf-8") as f:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        mode = 0o600
+
+        fd = os.open(self.cache_path, flags, mode)
+        with open(fd, "w", encoding="utf-8") as f:
             json.dump(state.to_dict(), f, indent=2)
-        logger.debug(f"Session state saved to {self.cache_path}")
+
+        try:
+            os.chmod(self.cache_path, 0o600)
+        except OSError:
+            pass
+
+        logger.debug(f"Session state saved to {self.cache_path} (mode 0600)")
 
     def load(self) -> Optional[SessionState]:
         """Loads existing session state if file exists."""

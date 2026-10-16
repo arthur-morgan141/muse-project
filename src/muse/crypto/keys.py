@@ -3,6 +3,7 @@ Cryptographic key management and fallback keys for Meta Muse.
 """
 
 from typing import Optional, Tuple
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 

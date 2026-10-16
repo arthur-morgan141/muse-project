@@ -3,6 +3,7 @@ Base HTTP client for Meta Muse Hatch API with RFC-7807 error translation.
 """
 
 from typing import Any, Dict, Optional
+
 import httpx
 
 from muse.core.config import MuseConfig, get_config

@@ -4,6 +4,7 @@ Shared test fixtures for Meta Muse tests.
 
 import sys
 from pathlib import Path
+
 import pytest
 
 # Ensure src is on Python path

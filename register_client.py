@@ -14,10 +14,18 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # Re-exports for backward compatibility with legacy scripts
-from muse.crypto.keys import DEFAULT_META_RSA_PUBLIC_KEY, resolve_encryption_key
-from muse.crypto.meta_cipher import encrypt_meta_password
-from muse.auth.client import MuseAuthClient
-from muse.cli.main import main
+from muse.auth.client import MuseAuthClient  # noqa: E402
+from muse.cli.main import main  # noqa: E402
+from muse.crypto.keys import DEFAULT_META_RSA_PUBLIC_KEY, resolve_encryption_key  # noqa: E402
+from muse.crypto.meta_cipher import encrypt_meta_password  # noqa: E402
+
+__all__ = [
+    "main",
+    "MuseAuthClient",
+    "DEFAULT_META_RSA_PUBLIC_KEY",
+    "resolve_encryption_key",
+    "encrypt_meta_password",
+]
 
 if __name__ == "__main__":
     # If invoked directly without subcommand (e.g. register_client.py --email ...),

@@ -4,11 +4,12 @@ Unit tests for Meta password envelope encryption and RSA key resolution.
 
 import base64
 import struct
+
 import pytest
 
-from muse.crypto.keys import resolve_encryption_key, DEFAULT_META_RSA_PUBLIC_KEY
-from muse.crypto.meta_cipher import encrypt_meta_password
 from muse.core.exceptions import CryptographyError
+from muse.crypto.keys import resolve_encryption_key
+from muse.crypto.meta_cipher import encrypt_meta_password
 
 
 def test_resolve_encryption_key_fallback():

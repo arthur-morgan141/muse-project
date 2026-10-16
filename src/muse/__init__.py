@@ -4,8 +4,8 @@ Reverse-engineered architecture for Direct API communication and MCP integration
 """
 
 from muse.__version__ import __version__
-from muse.core.config import get_config
 from muse.auth.client import MuseAuthClient
+from muse.core.config import get_config
 from muse.crypto.meta_cipher import encrypt_meta_password
 
 __all__ = [

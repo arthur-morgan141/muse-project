@@ -23,12 +23,3 @@ logging:
   level: "INFO"
   format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
   datefmt: "%Y-%m-%d %H:%M:%S"
-
-mcp:
-  enabled: false
-  host: "127.0.0.1"
-  port: 8765
-
-privacy:
-  ohttp_enabled: false
-  ohttp_relay_url: "https://meta-ohttp-relay-prod.fastly-edge.com"

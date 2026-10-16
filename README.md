@@ -1,6 +1,6 @@
-# Meta Muse Client & Agentic Framework (Project Aura / Hatch)
+# Meta Muse Registration & 1-Billion Token Redemption Client (Project Aura / Hatch)
 
-This project provides a modular API client and agentic runtime implementation for Meta Muse (`com.facebook.aura` v11.0.0.18.164), reverse-engineered directly from ARM64 native binaries (`libbackgroundinit.so`, `libtrafficnts.so`, `libmcp_server_jni.so`) and multi-DEX bytecode.
+This lightweight, modular API client is specifically dedicated to automating the Meta Muse (`com.facebook.aura`) registration flow, OTP verification, native password envelope encryption, and redeeming invite codes to claim the **1 Billion Token** compute quota.
 
 ---
 
@@ -56,19 +56,15 @@ muse-project/
 │       │   ├── logging.py          # Structured logging setup
 │       │   └── models.py           # Dataclass schemas (SessionState, AuthTokens, UserProfile)
 │       │
-│       ├── crypto/                 # Meta binary cryptographic engines
-│       │   ├── __init__.py
-│       │   ├── keys.py             # RSA 2048 fallback resolution & public key management
-│       │   └── meta_cipher.py      # #PWD_ENC envelope (EVP_SealInit + AES-256-GCM)
 │       │
-│       ├── mcp/                    # Model Context Protocol (Mobile MCP) integration
+│       ├── termux/                 # Termux Android hardware & system integration
 │       │   ├── __init__.py
-│       │   ├── server.py           # MCP server scaffolding
-│       │   └── tools.py            # Tool registry & dispatching engine
+│       │   └── helper.py           # Clipboard OTP detection, notifications, wake-lock
 │       │
-│       └── privacy/                # Privacy transport subsystems (OHTTP & Noise)
+│       └── crypto/                 # Meta binary cryptographic engines
 │           ├── __init__.py
-│           └── ohttp.py            # Oblivious HTTP (RFC 9292) relay client abstraction
+│           ├── keys.py             # RSA 2048 fallback resolution & public key management
+│           └── meta_cipher.py      # #PWD_ENC envelope (EVP_SealInit + AES-256-GCM)
 │
 ├── scripts/                        # Automation & execution launchers
 │   ├── run_dev.sh                  # Development environment runner (MUSE_ENV=development)
@@ -116,6 +112,16 @@ Use the development launcher script, which automatically sets `MUSE_ENV=developm
 ./scripts/run_dev.sh register --help
 ./scripts/run_dev.sh config
 ```
+
+### 2.4. Termux Android Installation
+For Termux on Android, run the automated zero-compile installer which uses Termux pre-built `python-cryptography` (preventing Rust/C compilation against Android Bionic libc) and integrates with Termux:API:
+```bash
+bash scripts/install_termux.sh
+```
+Key Termux features supported:
+- **Auto-Clipboard OTP Detection:** Automatically reads 6-digit codes copied to Android clipboard.
+- **Background Wake-Lock:** Automatically acquires `termux-wake-lock` during registration to prevent Android Doze termination.
+- **Native Android Notifications & Haptics:** Push notifications on OTP dispatch and vibration on successful account creation.
 
 ---
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "muse-project"
 version = "1.0.0"
-description = "Meta Muse (com.facebook.aura) API & Agentic Runtime Client"
+description = "Meta Muse Direct Registration & 1B Token Invite Redemption Client"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

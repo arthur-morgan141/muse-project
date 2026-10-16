@@ -10,6 +10,7 @@ Commands:
 import argparse
 import getpass
 import json
+import shutil
 import sys
 
 from muse.__version__ import __version__
@@ -17,135 +18,185 @@ from muse.auth.client import MuseAuthClient
 from muse.core.config import get_config, load_config
 from muse.core.logging import setup_logger
 from muse.core.models import UserProfile
+from muse.termux import (
+    acquire_wake_lock,
+    get_clipboard_otp,
+    is_termux,
+    release_wake_lock,
+    send_notification,
+    vibrate,
+)
 
 logger = setup_logger("muse.cli")
 
 
 def print_banner(step: int, title: str) -> None:
-    print(f"\n{'='*15} [{step}] {title} {'='*15}")
+    """Prints a responsive banner formatted cleanly on desktop and mobile screens."""
+    terminal_width = shutil.get_terminal_size((80, 20)).columns
+    max_width = min(terminal_width, 70)
+    step_str = f"[{step}] {title}"
+    if len(step_str) >= max_width:
+        print(f"\n--- {step_str} ---")
+        return
+
+    side_padding = max((max_width - len(step_str) - 2) // 2, 2)
+    bar = "=" * side_padding
+    print(f"\n{bar} {step_str} {bar}")
 
 
 def handle_register(args: argparse.Namespace) -> None:
     config = get_config()
     client = MuseAuthClient(config)
 
-    print(f"Meta Muse Registration Client (v{__version__}) - Environment: [{config.env}]")
-    state = client.initialize_session(force_new=args.new_session)
+    wake_locked = False
+    if is_termux() and not args.no_wake_lock:
+        wake_locked = acquire_wake_lock()
 
-    # Step 1: Start onboarding
-    if not state.temp_token:
-        print_banner(1, "Initiate Onboarding (/hatch/auth/start)")
+    try:
+        print(f"Meta Muse Registration Client (v{__version__}) - Environment: [{config.env}]")
+        if is_termux():
+            print("[Termux] Android environment detected. Termux:API integrations active.")
+
+        state = client.initialize_session(force_new=args.new_session)
+
+        # Step 1: Start onboarding
+        if not state.temp_token:
+            print_banner(1, "Initiate Onboarding (/hatch/auth/start)")
+            try:
+                client.start_onboarding()
+                print("[OK] Anonymous session initialized and server encryption key obtained.")
+            except Exception as e:
+                print(f"[FAILED] Failed to initialize onboarding: {e}")
+                sys.exit(1)
+        else:
+            print(f"\n[INFO] Resuming in-flight session: Device {state.device_id[:8]}...")
+
+        # Steps 2 & 3: Contact point & Dispatch OTP
+        if not state.completion_handle:
+            print_banner(2, "Login & Registration Options (/hatch/auth/login_options)")
+            contact_point = args.email or state.contact_point or input("Enter contact email address: ").strip()
+            region = args.region or state.region
+
+            if not contact_point:
+                print("[ERROR] Contact email cannot be empty.")
+                sys.exit(1)
+
+            try:
+                opts = client.check_login_options(contact_point, region)
+                print(f"[OK] Detected authentication flow: {opts.get('flow', 'REGISTER')}")
+            except Exception as e:
+                print(f"[FAILED] Error in login_options: {e}")
+                sys.exit(1)
+
+            print_banner(3, "Dispatch OTP Code (/hatch/auth/send_otp)")
+            try:
+                client.send_otp()
+                print(f"[OK] OTP verification code dispatched to {contact_point}.")
+                send_notification("Meta Muse", f"OTP code dispatched to {contact_point}")
+            except Exception as e:
+                print(f"[FAILED] Error in send_otp: {e}")
+                sys.exit(1)
+
+            if args.send_only:
+                print("\n[DISPATCH COMPLETED] Registration session state has been saved.")
+                print(f"Check your inbox ({contact_point}) for the 6-digit OTP code.")
+                print("To resume registration, run:")
+                print("  muse register --otp <CODE>")
+                return
+
+            # Step 4: Confirm OTP
+            print_banner(4, "Confirm OTP Code (/hatch/auth/confirm_otp)")
+            otp_code = args.otp
+
+            # Check Termux clipboard if no CLI argument passed
+            if not otp_code and is_termux():
+                clip_otp = get_clipboard_otp()
+                if clip_otp:
+                    print(f"[Termux Clipboard] Found 6-digit OTP in clipboard: {clip_otp}")
+                    use_clip = input(f"Use code '{clip_otp}'? [Y/n]: ").strip().lower()
+                    if use_clip in ("", "y", "yes"):
+                        otp_code = clip_otp
+
+            if not otp_code:
+                otp_code = input("Enter the 6-digit OTP code received: ").strip()
+
+            if not otp_code:
+                print("[ERROR] OTP code cannot be empty.")
+                sys.exit(1)
+
+            try:
+                handle = client.confirm_otp(otp_code)
+                print("[OK] OTP successfully verified!")
+                print(f"     Completion Handle: {handle[:25]}...")
+            except Exception as e:
+                print(f"[FAILED] Error confirming OTP: {e}")
+                sys.exit(1)
+        else:
+            print("\n[INFO] Completion handle is already available from previous session.")
+
+        # Step 5: Complete Registration
+        print_banner(5, "Complete Account Registration (/hatch/auth/register_completion)")
+        first_name = args.first_name or input("First Name: ").strip()
+        last_name = args.last_name or input("Last Name: ").strip()
+        dob = args.dob or input("Date of Birth (Format: YYYY-MM-DD): ").strip()
+        password = args.password or getpass.getpass("New Account Password: ").strip()
+
+        if not password:
+            print("[ERROR] Password cannot be empty.")
+            sys.exit(1)
+
+        profile = UserProfile(
+            first_name=first_name,
+            last_name=last_name,
+            date_of_birth=dob,
+            password=password,
+            region=args.region or state.region,
+        )
+
         try:
-            client.start_onboarding()
-            print("[OK] Anonymous session initialized and server encryption key obtained.")
+            tokens = client.complete_registration(profile)
+            print("\n[SUCCESS] Meta Muse Account Created Successfully!")
+            print(f"  Abra User ID     : {tokens.abra_user_id}")
+            print(f"  Abra Token       : {tokens.abra_access_token[:30]}...")
+            print(f"  FRL Account ID   : {tokens.frl_account_id}")
+
+            send_notification("Meta Muse", "Account successfully created!")
+            vibrate(200)
         except Exception as e:
-            print(f"[FAILED] Failed to initialize onboarding: {e}")
-            sys.exit(1)
-    else:
-        print(f"\n[INFO] Resuming in-flight session: Device {state.device_id[:8]}...")
-
-    # Steps 2 & 3: Contact point & Dispatch OTP
-    if not state.completion_handle:
-        print_banner(2, "Login & Registration Options (/hatch/auth/login_options)")
-        contact_point = args.email or state.contact_point or input("Enter contact email address: ").strip()
-        region = args.region or state.region
-
-        if not contact_point:
-            print("[ERROR] Contact email cannot be empty.")
+            print(f"[FAILED] Error in register_completion: {e}")
             sys.exit(1)
 
+        # Step 6: Check Gatekeeper Status
+        print_banner(6, "Check Gatekeeper Status (/hatch/activation_statuses)")
         try:
-            opts = client.check_login_options(contact_point, region)
-            print(f"[OK] Detected authentication flow: {opts.get('flow', 'REGISTER')}")
+            status = client.check_activation_status()
+            print(f"  Waitlist Status      : {status.waitlist_status}")
+            print(f"  Hatch Access Active  : {status.has_hatch_access}")
+            print(f"  Invite Code Redeemed : {status.has_redeemed_invite_code}")
         except Exception as e:
-            print(f"[FAILED] Error in login_options: {e}")
-            sys.exit(1)
-
-        print_banner(3, "Dispatch OTP Code (/hatch/auth/send_otp)")
-        try:
-            client.send_otp()
-            print(f"[OK] OTP verification code dispatched to {contact_point}.")
-        except Exception as e:
-            print(f"[FAILED] Error in send_otp: {e}")
-            sys.exit(1)
-
-        if args.send_only:
-            print("\n[DISPATCH COMPLETED] Registration session state has been saved.")
-            print(f"Check your inbox ({contact_point}) for the 6-digit OTP code.")
-            print("To resume registration, run:")
-            print("  muse register --otp <CODE>")
+            print(f"[WARNING] Failed to query activation status: {e}")
             return
 
-        # Step 4: Confirm OTP
-        print_banner(4, "Confirm OTP Code (/hatch/auth/confirm_otp)")
-        otp_code = args.otp or input("Enter the 6-digit OTP code received: ").strip()
-        if not otp_code:
-            print("[ERROR] OTP code cannot be empty.")
-            sys.exit(1)
+        # Step 7: Redeem Invite Code (optional)
+        print_banner(7, "Redeem Invite Code (/hatch/invite_code/redeem)")
+        invite_code = args.invite_code or input("Enter Invite Code [Press Enter to skip]: ").strip()
+        if not invite_code:
+            print("[INFO] Invite code redemption skipped. Base registration completed.")
+            return
 
         try:
-            handle = client.confirm_otp(otp_code)
-            print("[OK] OTP successfully verified!")
-            print(f"     Completion Handle: {handle[:25]}...")
+            redeem_res = client.redeem_invite_code(invite_code)
+            print("\n[COMPLETED] Invite Code Redeemed Successfully!")
+            print(f"  New Account Status : {redeem_res.get('waitlist_status')}")
+            print("  [ACCESS UNLOCKED] 1 Billion Token access quota activated!")
+            send_notification("Meta Muse", f"Invite redeemed! Status: {redeem_res.get('waitlist_status')}")
+            vibrate(200)
         except Exception as e:
-            print(f"[FAILED] Error confirming OTP: {e}")
-            sys.exit(1)
-    else:
-        print("\n[INFO] Completion handle is already available from previous session.")
+            print(f"[FAILED] Failed to redeem invite code: {e}")
 
-    # Step 5: Complete Registration
-    print_banner(5, "Complete Account Registration (/hatch/auth/register_completion)")
-    first_name = args.first_name or input("First Name: ").strip()
-    last_name = args.last_name or input("Last Name: ").strip()
-    dob = args.dob or input("Date of Birth (Format: YYYY-MM-DD): ").strip()
-    password = args.password or getpass.getpass("New Account Password: ").strip()
-
-    if not password:
-        print("[ERROR] Password cannot be empty.")
-        sys.exit(1)
-
-    profile = UserProfile(
-        first_name=first_name,
-        last_name=last_name,
-        date_of_birth=dob,
-        password=password,
-        region=args.region or state.region,
-    )
-
-    try:
-        tokens = client.complete_registration(profile)
-        print("\n[SUCCESS] Meta Muse Account Created Successfully!")
-        print(f"  Abra User ID     : {tokens.abra_user_id}")
-        print(f"  Abra Token       : {tokens.abra_access_token[:30]}...")
-        print(f"  FRL Account ID   : {tokens.frl_account_id}")
-    except Exception as e:
-        print(f"[FAILED] Error in register_completion: {e}")
-        sys.exit(1)
-
-    # Step 6: Check Gatekeeper Status
-    print_banner(6, "Check Gatekeeper Status (/hatch/activation_statuses)")
-    try:
-        status = client.check_activation_status()
-        print(f"  Waitlist Status      : {status.waitlist_status}")
-        print(f"  Hatch Access Active  : {status.has_hatch_access}")
-        print(f"  Invite Code Redeemed : {status.has_redeemed_invite_code}")
-    except Exception as e:
-        print(f"[WARNING] Failed to query activation status: {e}")
-        return
-
-    # Step 7: Redeem Invite Code (optional)
-    print_banner(7, "Redeem Invite Code (/hatch/invite_code/redeem)")
-    invite_code = args.invite_code or input("Enter Invite Code [Press Enter to skip]: ").strip()
-    if not invite_code:
-        print("[INFO] Invite code redemption skipped. Base registration completed.")
-        return
-
-    try:
-        redeem_res = client.redeem_invite_code(invite_code)
-        print("\n[COMPLETED] Invite Code Redeemed Successfully!")
-        print(f"  New Account Status : {redeem_res.get('waitlist_status')}")
-    except Exception as e:
-        print(f"[FAILED] Failed to redeem invite code: {e}")
+    finally:
+        if wake_locked:
+            release_wake_lock()
 
 
 def handle_status(args: argparse.Namespace) -> None:
@@ -187,6 +238,9 @@ def handle_redeem(args: argparse.Namespace) -> None:
         res = client.redeem_invite_code(code)
         print("\n[SUCCESS] Invite code redeemed successfully!")
         print(f"  New Status: {res.get('waitlist_status')}")
+        print("  [ACCESS UNLOCKED] 1 Billion Token access quota activated!")
+        send_notification("Meta Muse", f"Invite redeemed! Status: {res.get('waitlist_status')}")
+        vibrate(200)
     except Exception as e:
         print(f"[FAILED] Error: {e}")
         sys.exit(1)
@@ -220,6 +274,7 @@ def main() -> None:
     reg_p.add_argument("--invite-code", "-i", help="Invite code")
     reg_p.add_argument("--send-only", action="store_true", help="Send OTP and persist session without proceeding")
     reg_p.add_argument("--new-session", action="store_true", help="Ignore existing session cache and start clean")
+    reg_p.add_argument("--no-wake-lock", action="store_true", help="Disable Termux wake-lock during registration")
     reg_p.set_defaults(func=handle_register)
 
     # Subcommand: status

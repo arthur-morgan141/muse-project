@@ -5,9 +5,8 @@ Hierarchical configuration loader supporting YAML files and environment variable
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
-import yaml
 
-from muse.core.exceptions import ConfigurationError
+import yaml
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -22,7 +21,7 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 
 
 class MuseConfig:
-    """Application configuration holder."""
+    """Application configuration holder for registration & invite redemption."""
 
     def __init__(self, raw_data: Dict[str, Any]):
         self._data = raw_data
@@ -57,14 +56,6 @@ class MuseConfig:
         log_section = raw_data.get("logging", {})
         self.log_level = os.getenv("MUSE_LOG_LEVEL", log_section.get("level", "INFO"))
         self.log_format = log_section.get("format")
-
-        privacy_section = raw_data.get("privacy", {})
-        self.ohttp_enabled = os.getenv(
-            "MUSE_OHTTP_ENABLED", str(privacy_section.get("ohttp_enabled", False))
-        ).lower() in ("true", "1", "yes")
-        self.ohttp_relay_url = os.getenv(
-            "MUSE_OHTTP_RELAY_URL", privacy_section.get("ohttp_relay_url", "https://meta-ohttp-relay-prod.fastly-edge.com")
-        )
 
     def as_dict(self) -> Dict[str, Any]:
         return self._data

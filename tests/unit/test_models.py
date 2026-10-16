@@ -2,7 +2,7 @@
 Unit tests for data models and serialization.
 """
 
-from muse.core.models import SessionState, AuthTokens, UserProfile
+from muse.core.models import AuthTokens, SessionState
 
 
 def test_session_state_serialization():

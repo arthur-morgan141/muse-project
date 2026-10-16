@@ -1,0 +1,7 @@
+# ==============================================================================
+# Pure-Python dependencies for Termux Android environment
+# Note: 'python-cryptography' must be installed via Termux package manager
+# (pkg install python-cryptography) to avoid C/Rust compilation on Bionic libc.
+# ==============================================================================
+httpx>=0.28.0
+pyyaml>=6.0.1
