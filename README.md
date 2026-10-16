@@ -158,8 +158,17 @@ The primary CLI provides structured subcommands:
 
 ### A. New Account Registration (`muse register`)
 * **Interactive Mode (Recommended):**
+  Prompts for confirmation if an in-flight session is found, or register clean:
   ```bash
   muse register
+  ```
+* **Force Brand New Account Registration (No Auto-Resume):**
+  ```bash
+  muse register --new
+  ```
+* **Explicit Resume of In-Flight Session:**
+  ```bash
+  muse register --resume
   ```
 * **Two-Stage Mode (Dispatch OTP first, confirm later):**
   ```bash
@@ -182,25 +191,35 @@ The primary CLI provides structured subcommands:
     --invite-code "INVITE-CODE-ABC"
   ```
 
-### B. Query Activation & Waitlist Status (`muse status`)
+### B. Inspect or Clear In-Flight Sessions (`muse session`)
+Inspect active in-flight session progress or wipe the cache cleanly:
+```bash
+# View active in-flight session state
+muse session show
+
+# Discard/reset in-flight session cache
+muse session clear
+```
+
+### C. Query Activation & Waitlist Status (`muse status`)
 Check current account gatekeeper status using saved permanent credentials:
 ```bash
 muse status
 ```
 
-### C. Redeem Invite Code (`muse redeem`)
+### D. Redeem Invite Code (`muse redeem`)
 Redeem an invite code for an account that is on the waitlist:
 ```bash
 muse redeem YOUR-INVITE-CODE
 ```
 
-### D. Inspect Active Configuration (`muse config`)
+### E. Inspect Active Configuration (`muse config`)
 Display currently merged configuration values from YAML and environment variables:
 ```bash
 muse config
 ```
 
-### E. Backward Compatibility (`register_client.py`)
+### F. Backward Compatibility (`register_client.py`)
 Legacy scripts invoking `register_client.py` continue to work seamlessly:
 ```bash
 .venv/bin/python3 register_client.py --email user@example.com

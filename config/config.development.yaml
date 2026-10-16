@@ -7,7 +7,7 @@ api:
   timeout: 45.0
 
 auth:
-  auto_resume_session: true
+  auto_resume_session: false
 
 storage:
   session_cache_path: "data/sessions/session_cache.dev.json"

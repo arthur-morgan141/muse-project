@@ -34,9 +34,18 @@ class MuseAuthClient:
         self.token_store = token_store or TokenStore(self.config)
         self.state: Optional[SessionState] = None
 
-    def initialize_session(self, force_new: bool = False) -> SessionState:
+    def initialize_session(self, force_new: bool = False, resume: bool = False) -> SessionState:
         """Loads an existing in-flight session or creates a new one."""
-        if not force_new and self.config.auto_resume_session:
+        if force_new:
+            self.session_store.clear()
+            self.state = SessionState(
+                device_id=str(uuid.uuid4()),
+                waterfall_id=str(uuid.uuid4()),
+                region=self.config.default_region,
+            )
+            return self.state
+
+        if resume or self.config.auto_resume_session:
             existing = self.session_store.load()
             if existing:
                 logger.info(f"Resuming existing session: Device {existing.device_id[:8]}...")

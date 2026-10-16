@@ -13,7 +13,7 @@ api:
 auth:
   default_region: "US"
   default_key_id: 41
-  auto_resume_session: true
+  auto_resume_session: false
 
 storage:
   session_cache_path: "data/sessions/session_cache.json"

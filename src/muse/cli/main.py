@@ -57,7 +57,35 @@ def handle_register(args: argparse.Namespace) -> None:
         if is_termux():
             print("[Termux] Android environment detected. Termux:API integrations active.")
 
-        state = client.initialize_session(force_new=args.new_session)
+        # Determine session resumption strategy:
+        has_cache = client.session_store.has_session()
+        force_new = getattr(args, "new_session", False)
+        force_resume = getattr(args, "resume", False)
+
+        if has_cache and not force_new and not force_resume:
+            summary = client.session_store.get_summary()
+            if summary:
+                print("\n[IN-FLIGHT SESSION DETECTED]")
+                print(f"  Target Contact : {summary['contact_point']}")
+                print(f"  Current Stage  : {summary['last_step']}")
+                print(f"  Device UUID    : {summary['device_id'][:18]}...")
+                choice = input("\nDo you want to RESUME this session? [Y/n] (type 'n' to register a new account): ").strip().lower()
+                if choice in ("", "y", "yes"):
+                    state = client.initialize_session(resume=True)
+                else:
+                    client.session_store.clear()
+                    state = client.initialize_session(force_new=True)
+                    print("[INFO] Previous session cleared. Starting fresh registration.")
+            else:
+                state = client.initialize_session(force_new=False)
+        elif force_new:
+            state = client.initialize_session(force_new=True)
+            print("[INFO] Starting brand new registration (--new specified).")
+        elif force_resume:
+            state = client.initialize_session(resume=True)
+            print("[INFO] Resuming in-flight registration (--resume specified).")
+        else:
+            state = client.initialize_session()
 
         # Step 1: Start onboarding
         if not state.temp_token:
@@ -246,6 +274,32 @@ def handle_redeem(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def handle_session(args: argparse.Namespace) -> None:
+    config = get_config()
+    client = MuseAuthClient(config)
+    action = args.action or "show"
+
+    if action in ("show", "status"):
+        summary = client.session_store.get_summary()
+        if not summary:
+            print("\n[INFO] No in-flight registration session found.")
+            return
+        print("\n=== In-Flight Registration Session ===")
+        print(f"  Target Contact : {summary['contact_point']}")
+        print(f"  Current Stage  : {summary['last_step']}")
+        print(f"  Region         : {summary['region']}")
+        print(f"  Device UUID    : {summary['device_id']}")
+        print(f"  Temp Token     : {'Available' if summary['has_temp_token'] else 'None'}")
+        print(f"  OTP Confirmed  : {'Yes (Handle Ready)' if summary['has_completion_handle'] else 'No'}")
+        print(f"  Cache File     : {summary['cache_path']}")
+    elif action in ("clear", "reset", "delete"):
+        cleared = client.session_store.clear()
+        if cleared:
+            print("\n[OK] In-flight registration session cache has been deleted.")
+        else:
+            print("\n[INFO] No session cache was present.")
+
+
 def handle_config(args: argparse.Namespace) -> None:
     config = get_config()
     print(f"\n=== Active Muse Configuration [{config.env}] ===")
@@ -273,9 +327,18 @@ def main() -> None:
     reg_p.add_argument("--password", "-p", help="New account password")
     reg_p.add_argument("--invite-code", "-i", help="Invite code")
     reg_p.add_argument("--send-only", action="store_true", help="Send OTP and persist session without proceeding")
-    reg_p.add_argument("--new-session", action="store_true", help="Ignore existing session cache and start clean")
+    reg_p.add_argument("--new", "--fresh", "--new-session", dest="new_session", action="store_true",
+                       help="Start a brand new registration without resuming existing session")
+    reg_p.add_argument("--resume", action="store_true",
+                       help="Force resume existing in-flight session without prompting")
     reg_p.add_argument("--no-wake-lock", action="store_true", help="Disable Termux wake-lock during registration")
     reg_p.set_defaults(func=handle_register)
+
+    # Subcommand: session
+    sess_p = subparsers.add_parser("session", help="Inspect or clear active in-flight registration session")
+    sess_p.add_argument("action", nargs="?", choices=["show", "status", "clear", "reset"], default="show",
+                        help="Session action: 'show' (default) or 'clear'")
+    sess_p.set_defaults(func=handle_session)
 
     # Subcommand: status
     stat_p = subparsers.add_parser("status", help="Check account activation and waitlist status with saved token")

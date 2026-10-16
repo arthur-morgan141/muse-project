@@ -42,7 +42,7 @@ class MuseConfig:
         self.default_region = os.getenv("MUSE_DEFAULT_REGION", auth_section.get("default_region", "US"))
         self.default_key_id = int(auth_section.get("default_key_id", 41))
         self.auto_resume_session = os.getenv(
-            "MUSE_AUTO_RESUME_SESSION", str(auth_section.get("auto_resume_session", True))
+            "MUSE_AUTO_RESUME_SESSION", str(auth_section.get("auto_resume_session", False))
         ).lower() in ("true", "1", "yes")
 
         storage_section = raw_data.get("storage", {})

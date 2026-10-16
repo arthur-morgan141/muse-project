@@ -70,13 +70,24 @@ source .venv/bin/activate
 
 ### A. Full Interactive Registration (Recommended)
 ```bash
+# Interactive mode (prompts if previous session detected)
 muse register
+
+# Register a brand new account without auto-resuming
+muse register --new
 ```
 - **Automatic Wake-Lock:** Automatically holds `termux-wake-lock` during registration to prevent Android Doze from suspending the process when switching between apps.
 - **Auto-Clipboard Detection:** When the 6-digit OTP arrives via email or SMS, simply copy it. The CLI detects it in your clipboard and prompts:  
   `[Termux Clipboard] Found 6-digit OTP in clipboard: 123456. Use code '123456'? [Y/n]`
 
-### B. Two-Stage Registration (Send OTP First, Confirm Later)
+### B. Session Management
+Check in-flight session progress or reset:
+```bash
+muse session show
+muse session clear
+```
+
+### C. Two-Stage Registration (Send OTP First, Confirm Later)
 Useful if you want to dispatch the OTP and close or background the terminal:
 
 1. **Dispatch OTP:**
@@ -88,13 +99,13 @@ Useful if you want to dispatch the OTP and close or background the terminal:
    muse register --otp 123456
    ```
 
-### C. Check Gatekeeper & Activation Status
+### D. Check Gatekeeper & Activation Status
 Check if your account is active or still on the waitlist:
 ```bash
 muse status
 ```
 
-### D. Redeem Invite Code (Unlock 1-Billion Token Quota)
+### E. Redeem Invite Code (Unlock 1-Billion Token Quota)
 Redeem an invite code using your saved credentials:
 ```bash
 muse redeem YOUR-INVITE-CODE
