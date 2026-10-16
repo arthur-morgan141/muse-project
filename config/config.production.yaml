@@ -1,0 +1,14 @@
+environment: "production"
+
+logging:
+  level: "WARNING"
+
+api:
+  timeout: 20.0
+
+auth:
+  auto_resume_session: false
+
+storage:
+  session_cache_path: "data/sessions/session_cache.prod.json"
+  credentials_path: "data/sessions/credentials.prod.json"

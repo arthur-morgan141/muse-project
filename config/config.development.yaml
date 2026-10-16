@@ -1,0 +1,14 @@
+environment: "development"
+
+logging:
+  level: "DEBUG"
+
+api:
+  timeout: 45.0
+
+auth:
+  auto_resume_session: true
+
+storage:
+  session_cache_path: "data/sessions/session_cache.dev.json"
+  credentials_path: "data/sessions/credentials.dev.json"

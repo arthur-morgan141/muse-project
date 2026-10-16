@@ -1,0 +1,27 @@
+services:
+  muse-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: muse-project-dev
+    volumes:
+      - ..:/workspace
+    environment:
+      - MUSE_ENV=development
+      - MUSE_LOG_LEVEL=DEBUG
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    command: bash
+
+  muse-prod:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: muse-project-prod
+    environment:
+      - MUSE_ENV=production
+      - MUSE_LOG_LEVEL=INFO
+    volumes:
+      - ../data/sessions:/app/data/sessions
+    restart: unless-stopped
